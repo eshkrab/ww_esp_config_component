@@ -1,4 +1,8 @@
 version: "0.0.1"
 description: "Configuration component for Wearworks ESP projects"
-url: "[YOUR URL]"
+url: "https://github.com/eshkrab/ww_esp_config_component"
 license: "MIT"
+dependencies:
+  joltwallet/littlefs: "^1.14.4"
+  idf:
+    version: ">5.0.0"

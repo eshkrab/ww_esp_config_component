@@ -1,2 +1,4 @@
 idf_component_register(SRCS "config.c"
-                    INCLUDE_DIRS "include")
+                    INCLUDE_DIRS "include"
+                    REQUIRES json fs_utils
+                    )
