@@ -1,0 +1,4 @@
+version: "0.0.1"
+description: "Configuration component for Wearworks ESP projects"
+url: "[YOUR URL]"
+license: "MIT"
