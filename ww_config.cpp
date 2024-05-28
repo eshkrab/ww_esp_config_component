@@ -1,7 +1,7 @@
-#include "config.h"
-#include "main.h"
+#include "ww_config.h"
+// #include "main.h"
 // #include "cJSON.h"
-#include "tcpip.h"
+#include "ww_netman.h"
 
 #define TAG "CONFIG_PARSER"
 
@@ -21,15 +21,15 @@ void Config::initDefaults() {
     uart_baud = 115200;
     uart_tx_pin = 0;
     uart_rx_pin = 0;
-    dhcp_mode = 0;
-    strcpy(ip, "0.0.0.0");
-    strcpy(subnet, "255.255.255.0");
-    strcpy(gw, "0.0.0.0");
-    strcpy(SSID, "");
-    strcpy(pswd, "");
-    strcpy(AP_SSID, "espAP");
-    strcpy(AP_pswd, "0000");
-    net_mode = MODE_NONE;
+    net_config.dhcp = 0;
+    strcpy(net_config.ip, "0.0.0.0");
+    strcpy(net_config.subnet, "255.255.255.0");
+    strcpy(net_config.gw, "0.0.0.0");
+    strcpy(net_config.SSID, "");
+    strcpy(net_config.pswd, "");
+    strcpy(net_config.AP_SSID, "espAP");
+    strcpy(net_config.AP_pswd, "0000");
+    net_config.mode = MODE_NONE;
 }
 
 bool Config::loadConfigFile(const char* dir, const char* fn) {
@@ -83,37 +83,37 @@ void Config::loadConfig(char* buf) {
             strcpy(connection, val->valuestring);
             ESP_LOGI(TAG, "Connection: %s", connection);
             if ((strstr(connection, "none") != NULL))
-                net_mode = MODE_NONE;
+                net_config.mode = MODE_NONE;
             else {
-                net_mode = (strstr(connection, "eth") != NULL) ? MODE_ETH : MODE_WIFI;
-                net_mode = (strstr(connection, "ap") != NULL) ? MODE_AP : MODE_WIFI;
+                net_config.mode = (strstr(connection, "eth") != NULL) ? MODE_ETH : MODE_WIFI;
+                net_config.mode = (strstr(connection, "ap") != NULL) ? MODE_STA_AP : MODE_WIFI;
             }
-            ESP_LOGI(TAG, "Net Mode: %d", net_mode);
+            ESP_LOGI(TAG, "Net Mode: %d", net_config.mode);
             ESP_LOGI(TAG, "mode_wifi: %d", MODE_WIFI);
         }
         val = cJSON_GetObjectItem(network, "DHCP");
-        if (cJSON_IsNumber(val)) dhcp_mode = val->valueint;
+        if (cJSON_IsNumber(val)) net_config.dhcp= val->valueint;
 
         val = cJSON_GetObjectItem(network, "IP");
-        if (cJSON_IsString(val)) strcpy(ip, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.ip, val->valuestring);
 
         val = cJSON_GetObjectItem(network, "subnet");
-        if (cJSON_IsString(val)) strcpy(subnet, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.subnet, val->valuestring);
 
         val = cJSON_GetObjectItem(network, "gw");
-        if (cJSON_IsString(val)) strcpy(gw, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.gw, val->valuestring);
 
         val = cJSON_GetObjectItem(network, "SSID");
-        if (cJSON_IsString(val)) strcpy(SSID, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.SSID, val->valuestring);
 
         val = cJSON_GetObjectItem(network, "pswd");
-        if (cJSON_IsString(val)) strcpy(pswd, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.pswd, val->valuestring);
 
         val = cJSON_GetObjectItem(network, "AP_SSID");
-        if (cJSON_IsString(val)) strcpy(AP_SSID, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.AP_SSID, val->valuestring);
 
         val = cJSON_GetObjectItem(network, "AP_pswd");
-        if (cJSON_IsString(val)) strcpy(AP_pswd, val->valuestring);
+        if (cJSON_IsString(val)) strcpy(net_config.AP_pswd, val->valuestring);
     }
 
     ////////////////////////////////////////////////
@@ -177,14 +177,14 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     ////////////////////////////////////////////////
     cJSON* network = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "network", network);
-    cJSON_AddNumberToObject(network, "DHCP", dhcp_mode);
-    cJSON_AddStringToObject(network, "IP", ip);
-    cJSON_AddStringToObject(network, "subnet", subnet);
-    cJSON_AddStringToObject(network, "gw", gw);
-    cJSON_AddStringToObject(network, "SSID", SSID);
-    cJSON_AddStringToObject(network, "pswd", pswd);
-    cJSON_AddStringToObject(network, "AP_SSID", AP_SSID);
-    cJSON_AddStringToObject(network, "AP_pswd", AP_pswd);
+    cJSON_AddNumberToObject(network, "DHCP", net_config.dhcp);
+    cJSON_AddStringToObject(network, "IP", net_config.ip);
+    cJSON_AddStringToObject(network, "subnet", net_config.subnet);
+    cJSON_AddStringToObject(network, "gw", net_config.gw);
+    cJSON_AddStringToObject(network, "SSID", net_config.SSID);
+    cJSON_AddStringToObject(network, "pswd", net_config.pswd);
+    cJSON_AddStringToObject(network, "AP_SSID", net_config.AP_SSID);
+    cJSON_AddStringToObject(network, "AP_pswd", net_config.AP_pswd);
 
     ////////////////////////////////////////////////
     // CONTROL INFORMATION
@@ -236,13 +236,13 @@ void Config::printConfig() {
     ESP_LOGI(TAG, "UART TX Pin: %d", uart_tx_pin);
     ESP_LOGI(TAG, "UART RX Pin: %d", uart_rx_pin);
 
-    ESP_LOGI(TAG, "DHCP Mode: %d", dhcp_mode);
-    ESP_LOGI(TAG, "IP: %s", ip);
-    ESP_LOGI(TAG, "Subnet: %s", subnet);
-    ESP_LOGI(TAG, "GW: %s", gw);
-    ESP_LOGI(TAG, "SSID: %s", SSID);
-    ESP_LOGI(TAG, "PSWD: %s", pswd);
-    ESP_LOGI(TAG, "AP_SSID: %s", AP_SSID);
-    ESP_LOGI(TAG, "AP_PSWD: %s", AP_pswd);
-    ESP_LOGI(TAG, "Net Mode: %d", net_mode);
+    ESP_LOGI(TAG, "DHCP Mode: %d", net_config.dhcp);
+    ESP_LOGI(TAG, "IP: %s", net_config.ip);
+    ESP_LOGI(TAG, "Subnet: %s", net_config.subnet);
+    ESP_LOGI(TAG, "GW: %s", net_config.gw);
+    ESP_LOGI(TAG, "SSID: %s", net_config.SSID);
+    ESP_LOGI(TAG, "PSWD: %s", net_config.pswd);
+    ESP_LOGI(TAG, "AP_SSID: %s", net_config.AP_SSID);
+    ESP_LOGI(TAG, "AP_PSWD: %s", net_config.AP_pswd);
+    ESP_LOGI(TAG, "Net Mode: %d", net_config.mode);
 }

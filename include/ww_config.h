@@ -3,13 +3,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// #include "main.h"
-// enum net_mode_t {
-//     MODE_NONE,
-//     MODE_ETH,
-//     MODE_WIFI,
-//     MODE_AP
-// };
+#include "cJSON.h"
+#include "fs_utils.h"
+#include "ww_netman.h"
 
 class Config {
 public:
@@ -29,15 +25,7 @@ public:
   int uart_tx_pin;
   int uart_rx_pin;
 
-  int dhcp_mode;
-  char ip[16];
-  char subnet[16];
-  char gw[16];
-  char SSID[32];
-  char pswd[32];
-  char AP_SSID[32];
-  char AP_pswd[32];
-  int net_mode;
+  net_config_t net_config;
 
   Config();
   bool loadConfigFile(const char* dir, const char* fn);

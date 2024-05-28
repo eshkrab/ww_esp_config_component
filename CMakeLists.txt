@@ -1,4 +1,4 @@
-idf_component_register(SRCS "config.c"
+idf_component_register(SRC_DIRS "."
                     INCLUDE_DIRS "include"
-                    REQUIRES json fs_utils
+                    REQUIRES json fs_utils ww_netman
                     )
