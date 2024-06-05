@@ -173,12 +173,12 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     sprintf(fname, "/%s/%s", dir, fn);
 
     cJSON* root = cJSON_CreateObject();
+    
+    cJSON_AddNumberToObject(root, "id", id);
+    cJSON_AddNumberToObject(root, "version", version);
 
-    ////////////////////////////////////////////////
-    // NETWORK SETTINGS
-    ////////////////////////////////////////////////
     cJSON* network = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "network", network);
+    cJSON_AddStringToObject(network, "connection", net_config.mode == MODE_WIFI ? "wifi" : (net_config.mode == MODE_ETH ? "eth" : "none"));
     cJSON_AddNumberToObject(network, "DHCP", net_config.dhcp);
     cJSON_AddStringToObject(network, "IP", net_config.ip);
     cJSON_AddStringToObject(network, "subnet", net_config.subnet);
@@ -187,39 +187,36 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     cJSON_AddStringToObject(network, "pswd", net_config.pswd);
     cJSON_AddStringToObject(network, "AP_SSID", net_config.AP_SSID);
     cJSON_AddStringToObject(network, "AP_pswd", net_config.AP_pswd);
+    cJSON_AddItemToObject(root, "network", network);
 
-    ////////////////////////////////////////////////
-    // CONTROL INFORMATION
-    ////////////////////////////////////////////////
-    cJSON* ctrl = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "control", ctrl);
-    cJSON_AddNumberToObject(ctrl, "serial", serial_ctrl);
-    cJSON_AddNumberToObject(ctrl, "serial_tx", uart_tx_pin);
-    cJSON_AddNumberToObject(ctrl, "serial_rx", uart_rx_pin);
-    cJSON_AddNumberToObject(ctrl, "serial_baud", uart_baud);
-    cJSON_AddNumberToObject(ctrl, "osc", osc_ctrl);
-    cJSON_AddNumberToObject(ctrl, "osc_port", osc_port);
-    cJSON_AddNumberToObject(ctrl, "cmd_port", cmd_port);
-
-    ////////////////////////////////////////////////
-    // OTA INFORMATION
-    ////////////////////////////////////////////////
-    cJSON* ota = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "server", ota);
-    cJSON_AddStringToObject(ota, "server_ip", server_ip);
-    cJSON_AddStringToObject(ota, "filename", bin_fname);
-    cJSON_AddStringToObject(ota, "branch", dev_branch ? "dev" : "main");
-    cJSON_AddNumberToObject(ota, "ota_port", ota_port);
+    cJSON* server = cJSON_CreateObject();
+    cJSON_AddStringToObject(server, "server_ip", server_ip);
+    cJSON_AddStringToObject(server, "filename", bin_fname);
+    cJSON_AddNumberToObject(server, "ota_port", ota_port);
+    cJSON_AddNumberToObject(server, "cmd_port", cmd_port);
+    cJSON_AddStringToObject(server, "branch", dev_branch ? "dev" : "prod");
+    cJSON_AddItemToObject(root, "server", server);
 
     char* buf = cJSON_Print(root);
+
+    // Print the JSON structure before saving
+    ESP_LOGI(TAG, "Config JSON before saving: %s", buf);
+
     bool saved = writeFile(buf, fname, strlen(buf), "w");
 
     free(buf);
     cJSON_Delete(root);
 
+    // Print the saved file content
+    char* savedBuf = (char*)calloc(2048, 1);
+    int bytes = readFile(savedBuf, fname, 2048);
+    if (bytes > 0) {
+        ESP_LOGI(TAG, "Config JSON after saving: %s", savedBuf);
+    }
+    free(savedBuf);
+
     return saved;
 }
-
 
 void Config::printConfig() {
     ESP_LOGI(TAG, "ID: %d", id);
@@ -248,3 +245,4 @@ void Config::printConfig() {
     ESP_LOGI(TAG, "AP_PSWD: %s", net_config.AP_pswd);
     ESP_LOGI(TAG, "Net Mode: %d", net_config.mode);
 }
+
