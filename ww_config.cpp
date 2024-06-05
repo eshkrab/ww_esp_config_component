@@ -212,7 +212,7 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     cJSON_AddNumberToObject(ota, "ota_port", ota_port);
 
     char* buf = cJSON_Print(root);
-    bool saved = writeFile(fname, buf, strlen(buf), "w");
+    bool saved = writeFile(buf, fname, strlen(buf), "w");
 
     free(buf);
     cJSON_Delete(root);
