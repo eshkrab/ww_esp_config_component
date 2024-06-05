@@ -29,9 +29,8 @@ public:
 
   Config();
   bool loadConfigFile(const char* dir, const char* fn);
-  void loadConfig(char* buf);
+  bool loadConfig(char* buf);
   bool saveConfigFile(const char* dir, const char* fn);
-  void saveConfig(char* buf);
   void printConfig();
 
 private:

@@ -1,7 +1,7 @@
 #include "ww_config.h"
-// #include "main.h"
-// #include "cJSON.h"
 #include "ww_netman.h"
+
+#include "fs_utils.h"
 
 #define TAG "CONFIG_PARSER"
 
@@ -56,13 +56,13 @@ bool Config::loadConfigFile(const char* dir, const char* fn) {
     return loaded;
 }
 
-void Config::loadConfig(char* buf) {
+bool Config::loadConfig(char* buf) {
     cJSON* val = cJSON_CreateNull();
     cJSON* root = cJSON_Parse(buf);
 
     if (root == NULL) {
-        printf("ERROR opening settings json\n");
-        return;
+        ESP_LOGE("WW_CONFIG","ERROR opening config json");
+        return -1;
     }
     
     // ROOT VARS
@@ -89,7 +89,7 @@ void Config::loadConfig(char* buf) {
                 net_config.mode = (strstr(connection, "ap") != NULL) ? MODE_STA_AP : MODE_WIFI;
             }
             ESP_LOGI(TAG, "Net Mode: %d", net_config.mode);
-            ESP_LOGI(TAG, "mode_wifi: %d", MODE_WIFI);
+            ESP_LOGI(TAG, " is it mode_wifi? %d", net_config.mode == MODE_WIFI);
         }
         val = cJSON_GetObjectItem(network, "DHCP");
         if (cJSON_IsNumber(val)) net_config.dhcp= val->valueint;
@@ -164,7 +164,9 @@ void Config::loadConfig(char* buf) {
     }
 
     cJSON_Delete(root);
+    return 1;
 }
+
 
 bool Config::saveConfigFile(const char* dir, const char* fn) {
     char fname[64];
