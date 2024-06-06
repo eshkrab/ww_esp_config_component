@@ -6,6 +6,7 @@
 #include "cJSON.h"
 #include "fs_utils.h"
 #include "ww_netman.h"
+#include "ww_leds.h"
 
 class Config {
 public:
@@ -26,6 +27,7 @@ public:
   int uart_rx_pin;
 
   net_config_t net_config;
+  pixel_config_t leds_config;
 
   Config();
   bool loadConfigFile(const char* dir, const char* fn);

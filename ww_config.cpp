@@ -143,6 +143,43 @@ bool Config::loadConfig(char* buf) {
         if (cJSON_IsNumber(val)) cmd_port = val->valueint;
     }
 
+
+    ////////////////////////////////////////////////
+    //LED INFORMATION
+    ////////////////////////////////////////////////
+    cJSON *leds = cJSON_GetObjectItem(root,"leds");
+    if (cJSON_IsObject(leds)) {
+      val = cJSON_GetObjectItem(leds,"num_pixels");
+      if (cJSON_IsNumber(val)) leds_config.num_pixels = val->valueint;
+
+      val = cJSON_GetObjectItem(leds,"num_strips");
+      if (cJSON_IsNumber(val)) leds_config.num_strips = val->valueint;
+
+      val = cJSON_GetObjectItem(leds,"led_type");
+      if (cJSON_IsString(val)){
+        char _led_type[10];
+        strcpy(_led_type, val->valuestring);
+        leds_config.led_type = toLedType(_led_type);
+      }
+
+      cJSON * pin;
+      cJSON * pins = cJSON_GetObjectItem(leds, "data_pins");
+      if (cJSON_IsArray(pins)) {
+        if (leds_config.pins == NULL) {
+          leds_config.pins = new uint8_t[leds_config.num_strips];
+        }else{
+          delete[] leds_config.pins;
+          leds_config.pins = new uint8_t[leds_config.num_strips];
+        }
+        int c = 0;
+        cJSON_ArrayForEach(pin, pins) {
+          leds_config.pins[c++] = pin->valueint;
+          ESP_LOGD("JSON UTILS","PIN %d", pin->valueint);
+        }
+
+      }
+    }
+
     ////////////////////////////////////////////////
     // OTA INFORMATION
     ////////////////////////////////////////////////
