@@ -1,43 +1,39 @@
-#pragma once
+typedef struct leds_t {
+int data_pins[4];
+char * led_type;
+int num_pixels;
+int num_strips;
+}} {struct_name};
 
-#ifndef CONFIG_H
-#define CONFIG_H
+typedef struct network_t {
+int DHCP;
+char * SSID;
+char * pswd;
+char * IP;
+char * subnet;
+char * gw;
+}} {struct_name};
 
-#include "cJSON.h"
-#include "fs_utils.h"
-#include "ww_netman.h"
-#include "ww_leds.h"
+typedef struct streaming_t {
+int multicast;
+int start_chan;
+int start_uni;
+}} {struct_name};
 
-class Config {
-public:
-  int id;
-  double version;
+typedef struct settings_t {
+int autoplay;
+int autoplay_speed;
+int autostart;
+int brightness;
+char * play_mode;
+int shuffle;
+}} {struct_name};
 
-  char server_ip[16];
-  char bin_fname[30];
-  int ota_port;
-  bool dev_branch;
-
-  bool serial_ctrl;
-  bool osc_ctrl;
-  int osc_port;
-  int cmd_port;
-  int uart_baud;
-  int uart_tx_pin;
-  int uart_rx_pin;
-
-  net_config_t net_config;
-  pixel_config_t leds_config;
-
-  Config();
-  bool loadConfigFile(const char* dir, const char* fn);
-  bool loadConfig(char* buf);
-  bool saveConfigFile(const char* dir, const char* fn);
-  void printConfig();
-
-private:
-  void initDefaults();
-};
-
-#endif // CONFIG_H
-
+typedef struct config_t {
+char * connection;
+int framerate;
+leds_t leds;
+network_t network;
+streaming_t streaming;
+settings_t settings;
+}} {struct_name};

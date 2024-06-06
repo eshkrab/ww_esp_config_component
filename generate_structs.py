@@ -28,6 +28,6 @@ def generate_structs(config, struct_name="config_t"):
     return "\n\n".join(structs)
 
 structs_code = generate_structs(config)
-with open('ww_config.h', 'w') as f:
+with open('include/ww_config.h', 'w') as f:
     f.write(structs_code)
 

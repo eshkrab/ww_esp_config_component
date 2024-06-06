@@ -52,34 +52,46 @@ Here's an example `config.json` file used for generating the structures, parsing
 
 ```json
 {
-   "connection": "wifi",
-   "framerate": 60,
-   "leds": {
-      "data_pins": [9, 10, 5, 18],
-      "led_type": "WS2815",
-      "num_pixels": 300,
-      "num_strips": 4
-   },
-   "network": {
-     "DHCP": 0,
-     "SSID": "space_goats",
-     "pswd": "spacespace",
-     "IP": "192.168.10.226",
-     "subnet": "255.255.255.0",
-     "gw": "192.168.10.1"
-   },
-   "streaming": {
-      "multicast": 0,
-      "start_chan": 2,
-      "start_uni": 1
-   },
-   "settings": {
-      "autoplay": 1,
-      "autoplay_speed": 1000,
-      "autostart": 1,
-      "brightness": 70,
-      "play_mode": "sdcard",
-      "shuffle": 1
-   }
+  "id": 0,
+  "version": 0.1,
+  "connection": "wifi",
+  "framerate": 60,
+  "leds": {
+    "data_pins": [9, 10, 5, 18],
+    "led_type": "WS2815",
+    "num_pixels": 300,
+    "num_strips": 4
+  },
+  "network": {
+    "connection": "wifi",
+    "DHCP": 1,
+    "AP_SSID": "WW_ESP",
+    "AP_pswd": "waitingis",
+    "SSID": "ww.dev",
+    "pswd": "glitterpixels",
+    "IP": "10.25.0.25",
+    "subnet": "255.255.255.0",
+    "gw": "10.25.0.1"
+  },
+  "server": {
+    "server_ip": "10.25.0.144",
+    "cmd_port": 8080,
+    "branch": "dev",
+    "ota_port": 8070,
+    "filename": "ww-esp-app.bin"
+  },
+  "streaming": {
+    "multicast": 0,
+    "start_chan": 2,
+    "start_uni": 1
+  },
+  "settings": {
+    "autoplay": 1,
+    "autoplay_speed": 1000,
+    "autostart": 1,
+    "brightness": 70,
+    "play_mode": "sdcard",
+    "shuffle": 1
+  }
 }
 

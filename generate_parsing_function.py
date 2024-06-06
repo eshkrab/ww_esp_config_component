@@ -1,3 +1,9 @@
+import json
+
+# Load the JSON config
+with open('config.json') as f:
+    config = json.load(f)
+
 def generate_parsing_function(config, struct_name="config_t"):
     function_body = []
     for key, value in config.items():

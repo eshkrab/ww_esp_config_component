@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {{
                     configData[key] = value;
                 }}
             }} else {{
-                alert(`Invalid input for ${input.name}`);
+                alert(`Invalid input for ${input.id}`);
             }}
         }});
 
