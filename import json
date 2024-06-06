@@ -1,0 +1,126 @@
+import json
+
+# Load the JSON config
+with open('config.json') as f:
+    config = json.load(f)
+
+def generate_js_form(config):
+    field_labels = {
+        "id": "ID",
+        "version": "Version",
+        "MAC Address": "MAC Address",
+        "connection": "Connection Type",
+        "DHCP": "Use DHCP",
+        "SSID": "Wi-Fi Network Name (SSID)",
+        "pswd": "Wi-Fi Password",
+        "AP_SSID": "Access Point Mode Network Name",
+        "AP_pswd": "Access Point Mode Password",
+        "IP": "Static IP Address",
+        "subnet": "Subnet Mask",
+        "gw": "Gateway Address",
+        "server_ip": "Server IP Address",
+        "cmd_port": "Command Port",
+        "ota_port": "OTA Port",
+        "branch": "Branch",
+        "filename": "Firmware Filename"
+    }
+
+    def generate_field(key, value):
+        if isinstance(value, dict):
+            return f"createSection(configForm, '{key}', {generate_section(value)});"
+        elif isinstance(value, list):
+            return f"createArrayField(configForm, '{key}', {value});"
+        else:
+            input_type = "text"
+            if isinstance(value, int):
+                input_type = "number"
+            elif isinstance(value, bool):
+                input_type = "checkbox"
+            return f"createConfigField(configForm, '{key}', {value}, '{input_type}', field_labels['{key}']);"
+
+    def generate_section(config):
+        fields = [generate_field(k, v) for k, v in config.items()]
+        return f"[{', '.join(fields)}]"
+
+    js_code = f"""
+document.addEventListener('DOMContentLoaded', function() {{
+    const fieldLabels = {json.dumps(field_labels)};
+
+    // Load and populate config data
+    fetch('/config.json')
+        .then(response => response.json())
+        .then(data => {{
+            const configForm = document.getElementById('configForm');
+            {generate_section(config)}
+
+            toggleConfigEditable(false);
+        }})
+        .catch(error => console.error('Error fetching config:', error));
+
+    // Edit button functionality
+    document.getElementById('editConfigBtn').addEventListener('click', function() {{
+        toggleConfigEditable(true);
+    }});
+
+    // Save and reboot button
+    document.getElementById('saveConfigBtn').addEventListener('click', function() {{
+        let configData = {{}};
+        const configForm = document.getElementById('configForm');
+        const inputs = configForm.querySelectorAll('input, select');
+
+        inputs.forEach(input => {{
+            let [section, key] = input.id.split('_');
+            if (!key) {{
+                key = section;
+                section = null;
+            }}
+            if (input.checkValidity()) {{
+                let value;
+                if (input.type === 'checkbox') {{
+                    value = input.checked ? 1 : 0;
+                }} else if (input.type === 'number') {{
+                    value = parseFloat(input.value);
+                }} else {{
+                    value = input.value;
+                }}
+                if (section) {{
+                    if (!configData[section]) {{
+                        configData[section] = {{}};
+                    }}
+                    configData[section][key] = value;
+                }} else {{
+                    configData[key] = value;
+                }}
+            }} else {{
+                alert(`Invalid input for ${input.name}`);
+            }}
+        }});
+
+        fetch('/save_config', {{
+            method: 'POST',
+            headers: {{
+                'Content-Type': 'application/json'
+            }},
+            body: JSON.stringify(configData)
+        }})
+        .then(response => response.text())
+        .then(data => {{
+            alert(data);
+            // Reboot the device
+            fetch('/restart')
+                .then(response => response.text())
+                .then(data => {{
+                    alert(data);
+                }})
+                .catch(error => console.error('Error restarting:', error));
+        }})
+        .catch(error => console.error('Error saving config:', error));
+    }});
+}});
+    """
+    return js_code
+
+js_form_code = generate_js_form(config)
+with open('config.js', 'w') as f:
+    f.write(js_form_code)
+
