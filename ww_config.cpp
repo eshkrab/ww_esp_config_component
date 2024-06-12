@@ -1,6 +1,5 @@
 #include "ww_config.h"
 #include "ww_netman.h"
-
 #include "fs_utils.h"
 
 #define TAG "CONFIG_PARSER"
@@ -10,26 +9,50 @@ Config::Config() {
 }
 
 void Config::initDefaults() {
-    strcpy(server_ip, "0.0.0.0");
-    strcpy(bin_fname, "default.bin");
-    ota_port = 0;
+    id = 0;
+
+    strcpy(server_filename, "ww-esp");
+    version = 0.1;
+    strcpy(ota_server_ip, "0.0.0.0");
+    ota_port = 8070;
+    cmd_server_port = 8080;
     dev_branch = false;
+
     serial_ctrl = false;
     osc_ctrl = false;
-    osc_port = 0;
+    osc_port = 8000;
     cmd_port = 0;
+    uart_tx_pin = 21;
+    uart_rx_pin = 25;
     uart_baud = 115200;
-    uart_tx_pin = 0;
-    uart_rx_pin = 0;
-    net_config.dhcp = 0;
-    strcpy(net_config.ip, "0.0.0.0");
+
+    net_config.dhcp = 1;
+    strcpy(net_config.ip, "10.25.0.25");
     strcpy(net_config.subnet, "255.255.255.0");
-    strcpy(net_config.gw, "0.0.0.0");
-    strcpy(net_config.SSID, "");
-    strcpy(net_config.pswd, "");
-    strcpy(net_config.AP_SSID, "espAP");
-    strcpy(net_config.AP_pswd, "0000");
-    net_config.mode = MODE_NONE;
+    strcpy(net_config.gw, "10.25.0.1");
+    strcpy(net_config.SSID, "ww.dev");
+    strcpy(net_config.pswd, "glitterpixels");
+    strcpy(net_config.AP_SSID, "WW_ESP");
+    strcpy(net_config.AP_pswd, "waitingis");
+    net_config.mode = MODE_WIFI;
+
+    leds_config.num_pixels = 300;
+    leds_config.num_strips = 4;
+    leds_config.brightness = 70;
+    strcpy(leds_config.led_type, "WS2815");
+    leds_config.pins = new uint8_t[leds_config.num_strips] { 9, 10, 5, 18 };
+
+    player_config.framerate = 60;
+    player_config.autoplay = 1;
+    player_config.autoplay_speed = 1000;
+    player_config.autostart = 1;
+    strcpy(player_config.play_mode, "sdcard");
+    player_config.shuffle = 1;
+
+    strcpy(streaming_config.protocol, "sacn");
+    streaming_config.multicast = 0;
+    streaming_config.start_chan = 2;
+    streaming_config.start_uni = 1;
 }
 
 bool Config::loadConfigFile(const char* dir, const char* fn) {
@@ -42,14 +65,13 @@ bool Config::loadConfigFile(const char* dir, const char* fn) {
     bool loaded = false;
 
     if (buf == NULL) {
-        ESP_LOGE("loadConfigFile", "failed to allocate buffer");
+        ESP_LOGE(TAG, "Failed to allocate buffer");
         return loaded;
     }
 
     int bytes = readFile(buf, fname, 2048);
     if (bytes > 0) {
-        loadConfig(buf);
-        loaded = true;
+        loaded = loadConfig(buf);
     }
 
     free(buf);
@@ -57,20 +79,14 @@ bool Config::loadConfigFile(const char* dir, const char* fn) {
 }
 
 bool Config::loadConfig(char* buf) {
-    cJSON* val = cJSON_CreateNull();
     cJSON* root = cJSON_Parse(buf);
-
     if (root == NULL) {
-        ESP_LOGE("WW_CONFIG","ERROR opening config json");
-        return -1;
+        ESP_LOGE(TAG, "ERROR opening config JSON");
+        return false;
     }
-    
-    // ROOT VARS
-    val = cJSON_GetObjectItem(root, "id");
-    if (cJSON_IsNumber(val)) id = val->valueint;
 
-    val = cJSON_GetObjectItem(root, "version");
-    if (cJSON_IsNumber(val)) version = val->valuedouble;
+    cJSON* val = cJSON_GetObjectItem(root, "id");
+    if (cJSON_IsNumber(val)) id = val->valueint;
 
     ////////////////////////////////////////////////
     // NETWORK SETTINGS
@@ -78,21 +94,11 @@ bool Config::loadConfig(char* buf) {
     cJSON* network = cJSON_GetObjectItem(root, "network");
     if (cJSON_IsObject(network)) {
         val = cJSON_GetObjectItem(network, "connection");
-        if (cJSON_IsString(val)) {
-            char connection[16];
-            strcpy(connection, val->valuestring);
-            ESP_LOGI(TAG, "Connection: %s", connection);
-            if ((strstr(connection, "none") != NULL))
-                net_config.mode = MODE_NONE;
-            else {
-                net_config.mode = (strstr(connection, "eth") != NULL) ? MODE_ETH : MODE_WIFI;
-                net_config.mode = (strstr(connection, "ap") != NULL) ? MODE_STA_AP : MODE_WIFI;
-            }
-            ESP_LOGI(TAG, "Net Mode: %d", net_config.mode);
-            ESP_LOGI(TAG, " is it mode_wifi? %d", net_config.mode == MODE_WIFI);
-        }
+        if (cJSON_IsString(val))
+            net_config.mode = (strcmp(val->valuestring, "wifi") == 0) ? MODE_WIFI : (strcmp(val->valuestring, "eth") == 0) ? MODE_ETH : MODE_NONE;
+
         val = cJSON_GetObjectItem(network, "DHCP");
-        if (cJSON_IsNumber(val)) net_config.dhcp= val->valueint;
+        if (cJSON_IsNumber(val)) net_config.dhcp = val->valueint;
 
         val = cJSON_GetObjectItem(network, "IP");
         if (cJSON_IsString(val)) strcpy(net_config.ip, val->valuestring);
@@ -117,105 +123,142 @@ bool Config::loadConfig(char* buf) {
     }
 
     ////////////////////////////////////////////////
-    // CONTROL INFORMATION
+    // LED SETTINGS
     ////////////////////////////////////////////////
-    cJSON* ctrl = cJSON_GetObjectItem(root, "control");
-    if (cJSON_IsObject(ctrl)) {
-        val = cJSON_GetObjectItem(ctrl, "serial");
+    cJSON* leds = cJSON_GetObjectItem(root, "leds");
+    if (cJSON_IsObject(leds)) {
+        val = cJSON_GetObjectItem(leds, "num_pixels");
+        if (cJSON_IsNumber(val)) leds_config.num_pixels = val->valueint;
+
+        val = cJSON_GetObjectItem(leds, "num_strips");
+        if (cJSON_IsNumber(val)) leds_config.num_strips = val->valueint;
+
+        val = cJSON_GetObjectItem(leds, "brightness");
+        if (cJSON_IsNumber(val)) leds_config.brightness = val->valueint;
+
+        val = cJSON_GetObjectItem(leds, "led_type");
+        if (cJSON_IsString(val)) strcpy(leds_config.led_type, val->valuestring);
+
+        cJSON* pins = cJSON_GetObjectItem(leds, "data_pins");
+        if (cJSON_IsArray(pins)) {
+            delete[] leds_config.pins;
+            leds_config.pins = new uint8_t[leds_config.num_strips];
+            int i = 0;
+            cJSON* pin;
+            cJSON_ArrayForEach(pin, pins) {
+                leds_config.pins[i++] = pin->valueint;
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////
+    // PLAYER SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* player = cJSON_GetObjectItem(root, "player");
+    if (cJSON_IsObject(player)) {
+        val = cJSON_GetObjectItem(player, "framerate");
+        if (cJSON_IsNumber(val)) player_config.framerate = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "autoplay");
+        if (cJSON_IsNumber(val)) player_config.autoplay = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "autoplay_speed");
+        if (cJSON_IsNumber(val)) player_config.autoplay_speed = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "autostart");
+        if (cJSON_IsNumber(val)) player_config.autostart = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "play_mode");
+        if (cJSON_IsString(val)) strcpy(player_config.play_mode, val->valuestring);
+
+        val = cJSON_GetObjectItem(player, "shuffle");
+        if (cJSON_IsNumber(val)) player_config.shuffle = val->valueint;
+    }
+
+    ////////////////////////////////////////////////
+    // STREAMING SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* streaming = cJSON_GetObjectItem(root, "streaming");
+    if (cJSON_IsObject(streaming)) {
+        val = cJSON_GetObjectItem(streaming, "protocol");
+        if (cJSON_IsString(val)) strcpy(streaming_config.protocol, val->valuestring);
+
+        val = cJSON_GetObjectItem(streaming, "multicast");
+        if (cJSON_IsNumber(val)) streaming_config.multicast = val->valueint;
+
+        val = cJSON_GetObjectItem(streaming, "start_chan");
+        if (cJSON_IsNumber(val)) streaming_config.start_chan = val->valueint;
+
+        val = cJSON_GetObjectItem(streaming, "start_uni");
+        if (cJSON_IsNumber(val)) streaming_config.start_uni = val->valueint;
+    }
+
+    ////////////////////////////////////////////////
+    // CONTROL SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* control = cJSON_GetObjectItem(root, "control");
+    if (cJSON_IsObject(control)) {
+        val = cJSON_GetObjectItem(control, "serial");
         if (cJSON_IsNumber(val)) serial_ctrl = val->valueint;
 
-        val = cJSON_GetObjectItem(ctrl, "serial_tx");
+        val = cJSON_GetObjectItem(control, "serial_tx");
         if (cJSON_IsNumber(val)) uart_tx_pin = val->valueint;
 
-        val = cJSON_GetObjectItem(ctrl, "serial_rx");
+        val = cJSON_GetObjectItem(control, "serial_rx");
         if (cJSON_IsNumber(val)) uart_rx_pin = val->valueint;
 
-        val = cJSON_GetObjectItem(ctrl, "serial_baud");
+        val = cJSON_GetObjectItem(control, "serial_baud");
         if (cJSON_IsNumber(val)) uart_baud = val->valueint;
 
-        val = cJSON_GetObjectItem(ctrl, "osc");
+        val = cJSON_GetObjectItem(control, "osc");
         if (cJSON_IsNumber(val)) osc_ctrl = val->valueint;
 
-        val = cJSON_GetObjectItem(ctrl, "osc_port");
+        val = cJSON_GetObjectItem(control, "osc_port");
         if (cJSON_IsNumber(val)) osc_port = val->valueint;
-
-        val = cJSON_GetObjectItem(ctrl, "cmd_port");
-        if (cJSON_IsNumber(val)) cmd_port = val->valueint;
-    }
-
-
-    ////////////////////////////////////////////////
-    //LED INFORMATION
-    ////////////////////////////////////////////////
-    cJSON *leds = cJSON_GetObjectItem(root,"leds");
-    if (cJSON_IsObject(leds)) {
-      val = cJSON_GetObjectItem(leds,"num_pixels");
-      if (cJSON_IsNumber(val)) leds_config.num_pixels = val->valueint;
-
-      val = cJSON_GetObjectItem(leds,"num_strips");
-      if (cJSON_IsNumber(val)) leds_config.num_strips = val->valueint;
-
-      val = cJSON_GetObjectItem(leds,"led_type");
-      if (cJSON_IsString(val)){
-        char _led_type[10];
-        strcpy(_led_type, val->valuestring);
-        leds_config.led_type = toLedType(_led_type);
-      }
-
-      cJSON * pin;
-      cJSON * pins = cJSON_GetObjectItem(leds, "data_pins");
-      if (cJSON_IsArray(pins)) {
-        if (leds_config.pins == NULL) {
-          leds_config.pins = new uint8_t[leds_config.num_strips];
-        }else{
-          delete[] leds_config.pins;
-          leds_config.pins = new uint8_t[leds_config.num_strips];
-        }
-        int c = 0;
-        cJSON_ArrayForEach(pin, pins) {
-          leds_config.pins[c++] = pin->valueint;
-          ESP_LOGD("JSON UTILS","PIN %d", pin->valueint);
-        }
-
-      }
     }
 
     ////////////////////////////////////////////////
-    // OTA INFORMATION
+    // SERVER SETTINGS
     ////////////////////////////////////////////////
-    cJSON* ota = cJSON_GetObjectItem(root, "server");
-    if (cJSON_IsObject(ota)) {
-        val = cJSON_GetObjectItem(ota, "server_ip");
-        if (cJSON_IsString(val)) strcpy(server_ip, val->valuestring);
+    cJSON* server = cJSON_GetObjectItem(root, "server");
+    if (cJSON_IsObject(server)) {
+        val = cJSON_GetObjectItem(server, "filename");
+        if (cJSON_IsString(val)) strcpy(server_filename, val->valuestring);
 
-        val = cJSON_GetObjectItem(ota, "filename");
-        if (cJSON_IsString(val)) strcpy(bin_fname, val->valuestring);
+        val = cJSON_GetObjectItem(server, "version");
+        if (cJSON_IsNumber(val)) version = val->valuedouble;
 
-        val = cJSON_GetObjectItem(ota, "branch");
+        val = cJSON_GetObjectItem(server, "branch");
         if (cJSON_IsString(val)) {
-            if (strcmp(val->valuestring, "dev") == 0) dev_branch = true;
+            dev_branch = strcmp(val->valuestring, "dev") == 0;
         }
 
-        val = cJSON_GetObjectItem(ota, "ota_port");
+        val = cJSON_GetObjectItem(server, "ota_server_ip");
+        if (cJSON_IsString(val)) strcpy(ota_server_ip, val->valuestring);
+
+        val = cJSON_GetObjectItem(server, "ota_port");
         if (cJSON_IsNumber(val)) ota_port = val->valueint;
+
+        val = cJSON_GetObjectItem(server, "cmd_server_port");
+        if (cJSON_IsNumber(val)) cmd_server_port = val->valueint;
     }
 
     cJSON_Delete(root);
-    return 1;
+    return true;
 }
-
 
 bool Config::saveConfigFile(const char* dir, const char* fn) {
     char fname[64];
     sprintf(fname, "/%s/%s", dir, fn);
 
     cJSON* root = cJSON_CreateObject();
-    
     cJSON_AddNumberToObject(root, "id", id);
-    cJSON_AddNumberToObject(root, "version", version);
 
+    ////////////////////////////////////////////////
+    // NETWORK SETTINGS
+    ////////////////////////////////////////////////
     cJSON* network = cJSON_CreateObject();
-    cJSON_AddStringToObject(network, "connection", net_config.mode == MODE_WIFI ? "wifi" : (net_config.mode == MODE_ETH ? "eth" : "none"));
+    cJSON_AddStringToObject(network, "connection", net_config.mode == MODE_WIFI ? "wifi" : net_config.mode == MODE_ETH ? "eth" : "none");
     cJSON_AddNumberToObject(network, "DHCP", net_config.dhcp);
     cJSON_AddStringToObject(network, "IP", net_config.ip);
     cJSON_AddStringToObject(network, "subnet", net_config.subnet);
@@ -226,17 +269,69 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     cJSON_AddStringToObject(network, "AP_pswd", net_config.AP_pswd);
     cJSON_AddItemToObject(root, "network", network);
 
+    ////////////////////////////////////////////////
+    // LED SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* leds = cJSON_CreateObject();
+    cJSON_AddNumberToObject(leds, "num_pixels", leds_config.num_pixels);
+    cJSON_AddNumberToObject(leds, "num_strips", leds_config.num_strips);
+    cJSON_AddNumberToObject(leds, "brightness", leds_config.brightness);
+    cJSON_AddStringToObject(leds, "led_type", leds_config.led_type);
+
+    cJSON* pins = cJSON_CreateArray();
+    for (int i = 0; i < leds_config.num_strips; i++) {
+        cJSON_AddItemToArray(pins, cJSON_CreateNumber(leds_config.pins[i]));
+    }
+    cJSON_AddItemToObject(leds, "data_pins", pins);
+    cJSON_AddItemToObject(root, "leds", leds);
+
+    ////////////////////////////////////////////////
+    // PLAYER SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* player = cJSON_CreateObject();
+    cJSON_AddNumberToObject(player, "framerate", player_config.framerate);
+    cJSON_AddNumberToObject(player, "autoplay", player_config.autoplay);
+    cJSON_AddNumberToObject(player, "autoplay_speed", player_config.autoplay_speed);
+    cJSON_AddNumberToObject(player, "autostart", player_config.autostart);
+    cJSON_AddStringToObject(player, "play_mode", player_config.play_mode);
+    cJSON_AddNumberToObject(player, "shuffle", player_config.shuffle);
+    cJSON_AddItemToObject(root, "player", player);
+
+    ////////////////////////////////////////////////
+    // STREAMING SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* streaming = cJSON_CreateObject();
+    cJSON_AddStringToObject(streaming, "protocol", streaming_config.protocol);
+    cJSON_AddNumberToObject(streaming, "multicast", streaming_config.multicast);
+    cJSON_AddNumberToObject(streaming, "start_chan", streaming_config.start_chan);
+    cJSON_AddNumberToObject(streaming, "start_uni", streaming_config.start_uni);
+    cJSON_AddItemToObject(root, "streaming", streaming);
+
+    ////////////////////////////////////////////////
+    // CONTROL SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* ctrl = cJSON_CreateObject();
+    cJSON_AddNumberToObject(ctrl, "serial", serial_ctrl);
+    cJSON_AddNumberToObject(ctrl, "serial_tx", uart_tx_pin);
+    cJSON_AddNumberToObject(ctrl, "serial_rx", uart_rx_pin);
+    cJSON_AddNumberToObject(ctrl, "serial_baud", uart_baud);
+    cJSON_AddNumberToObject(ctrl, "osc", osc_ctrl);
+    cJSON_AddNumberToObject(ctrl, "osc_port", osc_port);
+    cJSON_AddItemToObject(root, "control", ctrl);
+
+    ////////////////////////////////////////////////
+    // SERVER SETTINGS
+    ////////////////////////////////////////////////
     cJSON* server = cJSON_CreateObject();
-    cJSON_AddStringToObject(server, "server_ip", server_ip);
-    cJSON_AddStringToObject(server, "filename", bin_fname);
-    cJSON_AddNumberToObject(server, "ota_port", ota_port);
-    cJSON_AddNumberToObject(server, "cmd_port", cmd_port);
+    cJSON_AddStringToObject(server, "filename", server_filename);
+    cJSON_AddNumberToObject(server, "version", version);
     cJSON_AddStringToObject(server, "branch", dev_branch ? "dev" : "prod");
+    cJSON_AddStringToObject(server, "ota_server_ip", ota_server_ip);
+    cJSON_AddNumberToObject(server, "ota_port", ota_port);
+    cJSON_AddNumberToObject(server, "cmd_server_port", cmd_server_port);
     cJSON_AddItemToObject(root, "server", server);
 
     char* buf = cJSON_Print(root);
-
-    // Print the JSON structure before saving
     ESP_LOGI(TAG, "Config JSON before saving: %s", buf);
 
     bool saved = writeFile(buf, fname, strlen(buf), "w");
@@ -244,7 +339,6 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     free(buf);
     cJSON_Delete(root);
 
-    // Print the saved file content
     char* savedBuf = (char*)calloc(2048, 1);
     int bytes = readFile(savedBuf, fname, 2048);
     if (bytes > 0) {
@@ -257,11 +351,12 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
 
 void Config::printConfig() {
     ESP_LOGI(TAG, "ID: %d", id);
-    ESP_LOGI(TAG, "Version: %f", version);
 
-    ESP_LOGI(TAG, "Server IP: %s", server_ip);
-    ESP_LOGI(TAG, "Bin Filename: %s", bin_fname);
+    ESP_LOGI(TAG, "Server Filename: %s", server_filename);
+    ESP_LOGI(TAG, "Version: %f", version);
+    ESP_LOGI(TAG, "OTA Server IP: %s", ota_server_ip);
     ESP_LOGI(TAG, "OTA Port: %d", ota_port);
+    ESP_LOGI(TAG, "CMD Server Port: %d", cmd_server_port);
     ESP_LOGI(TAG, "Dev Branch: %d", dev_branch);
 
     ESP_LOGI(TAG, "Serial Control: %d", serial_ctrl);
@@ -281,5 +376,21 @@ void Config::printConfig() {
     ESP_LOGI(TAG, "AP_SSID: %s", net_config.AP_SSID);
     ESP_LOGI(TAG, "AP_PSWD: %s", net_config.AP_pswd);
     ESP_LOGI(TAG, "Net Mode: %d", net_config.mode);
-}
 
+    ESP_LOGI(TAG, "Number of Pixels: %d", leds_config.num_pixels);
+    ESP_LOGI(TAG, "Number of Strips: %d", leds_config.num_strips);
+    ESP_LOGI(TAG, "Brightness: %d", leds_config.brightness);
+    ESP_LOGI(TAG, "LED Type: %s", leds_config.led_type);
+
+    ESP_LOGI(TAG, "Player Framerate: %d", player_config.framerate);
+    ESP_LOGI(TAG, "Player Autoplay: %d", player_config.autoplay);
+    ESP_LOGI(TAG, "Player Autoplay Speed: %d", player_config.autoplay_speed);
+    ESP_LOGI(TAG, "Player Autostart: %d", player_config.autostart);
+    ESP_LOGI(TAG, "Player Play Mode: %s", player_config.play_mode);
+    ESP_LOGI(TAG, "Player Shuffle: %d", player_config.shuffle);
+
+    ESP_LOGI(TAG, "Streaming Protocol: %s", streaming_config.protocol);
+    ESP_LOGI(TAG, "Streaming Multicast: %d", streaming_config.multicast);
+    ESP_LOGI(TAG, "Streaming Start Channel: %d", streaming_config.start_chan);
+    ESP_LOGI(TAG, "Streaming Start Universe: %d", streaming_config.start_uni);
+}
