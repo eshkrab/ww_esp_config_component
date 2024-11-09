@@ -8,8 +8,10 @@
 #include "fs_utils.h"
 #include "ww_netman.h"
 #include "ww_leds.h"
-#include "player.h"  // Include player.h for player settings
-#include "streaming.h"  // Include streaming.h for streaming settings
+#include "ww_player.h"  // Include player.h for player settings
+#include "ww_sacn.h"  
+
+// #include "streaming.h"  // Include streaming.h for streaming settings
 
 class Config {
 public:
@@ -23,17 +25,25 @@ public:
     bool dev_branch;
 
     bool serial_ctrl;
+    bool dmx_ctrl;
     bool osc_ctrl;
     int osc_port;
     int cmd_port;
+
     int uart_baud;
     int uart_tx_pin;
     int uart_rx_pin;
+    int dmx_tx_pin;
+    int dmx_rx_pin;
+    int dmx_rst_pin;
+    int dmx_addr; // max 512
+    int num_dmx_channels;
+
 
     net_config_t net_config;
     pixel_config_t leds_config;
-    player_config_t player_config;  // Player settings
-    streaming_config_t streaming_config;  // Streaming settings
+    // player_config_t player_config;  // Player settings
+    sacn_config_t streaming_config;  // Streaming settings
 
     Config();
     bool loadConfigFile(const char* dir, const char* fn);

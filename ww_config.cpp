@@ -19,12 +19,19 @@ void Config::initDefaults() {
     dev_branch = false;
 
     serial_ctrl = false;
+    dmx_ctrl = false;
     osc_ctrl = false;
     osc_port = 8000;
     cmd_port = 0;
     uart_tx_pin = 21;
     uart_rx_pin = 25;
     uart_baud = 115200;
+
+    dmx_tx_pin = 17;
+    dmx_rx_pin = 16;
+    dmx_rst_pin = 21;
+    dmx_addr = 0; // max 512
+    num_dmx_channels = 512;
 
     net_config.dhcp = 1;
     strcpy(net_config.ip, "10.25.0.25");
@@ -38,21 +45,24 @@ void Config::initDefaults() {
 
     leds_config.num_pixels = 300;
     leds_config.num_strips = 4;
-    leds_config.brightness = 70;
-    strcpy(leds_config.led_type, "WS2815");
+    leds_config.brightness = 20;
+    // strcpy(leds_config.led_type, "WS2812");
+    leds_config.led_type = LED_WS2812;
     leds_config.pins = new uint8_t[leds_config.num_strips] { 9, 10, 5, 18 };
 
-    player_config.framerate = 60;
-    player_config.autoplay = 1;
-    player_config.autoplay_speed = 1000;
-    player_config.autostart = 1;
-    strcpy(player_config.play_mode, "sdcard");
-    player_config.shuffle = 1;
+    // player_config.framerate = 60;
+    // player_config.autoplay = 1;
+    // player_config.autoplay_speed = 1000;
+    // player_config.autostart = 1;
+    // strcpy(player_config.play_mode, "sdcard");
+    // player_config.shuffle = 1;
 
-    strcpy(streaming_config.protocol, "sacn");
+    // strcpy(streaming_config.protocol, "sacn");
+    streaming_config.protocol = LEDProtocol::E131;
+
     streaming_config.multicast = 0;
-    streaming_config.start_chan = 2;
-    streaming_config.start_uni = 1;
+    streaming_config.start_channel = 2;
+    streaming_config.start_universe = 1;
 }
 
 bool Config::loadConfigFile(const char* dir, const char* fn) {
@@ -122,9 +132,9 @@ bool Config::loadConfig(char* buf) {
         if (cJSON_IsString(val)) strcpy(net_config.AP_pswd, val->valuestring);
     }
 
-    ////////////////////////////////////////////////
-    // LED SETTINGS
-    ////////////////////////////////////////////////
+    // ////////////////////////////////////////////////
+    // // LED SETTINGS
+    // ////////////////////////////////////////////////
     cJSON* leds = cJSON_GetObjectItem(root, "leds");
     if (cJSON_IsObject(leds)) {
         val = cJSON_GetObjectItem(leds, "num_pixels");
@@ -137,7 +147,22 @@ bool Config::loadConfig(char* buf) {
         if (cJSON_IsNumber(val)) leds_config.brightness = val->valueint;
 
         val = cJSON_GetObjectItem(leds, "led_type");
-        if (cJSON_IsString(val)) strcpy(leds_config.led_type, val->valuestring);
+        // if (cJSON_IsString(val)) strcpy(leds_config.led_type, val->valuestring);
+        // map enum and string like
+        // enum led_type_t { LED_WS2811, LED_WS2812, LED_WS2812B
+        if (cJSON_IsString(val)) {
+          if (strcmp(val->valuestring, "WS2811") == 0) {
+            leds_config.led_type = LED_WS2811;
+
+          } else if (strcmp(val->valuestring, "WS2812") == 0) {
+            leds_config.led_type = LED_WS2812;
+          } else if (strcmp(val->valuestring, "WS2812B") == 0) {
+            leds_config.led_type = LED_WS2812B;
+          } else {
+            leds_config.led_type = LED_WS2812;
+          }
+        }
+
 
         cJSON* pins = cJSON_GetObjectItem(leds, "data_pins");
         if (cJSON_IsArray(pins)) {
@@ -151,29 +176,29 @@ bool Config::loadConfig(char* buf) {
         }
     }
 
-    ////////////////////////////////////////////////
-    // PLAYER SETTINGS
-    ////////////////////////////////////////////////
-    cJSON* player = cJSON_GetObjectItem(root, "player");
-    if (cJSON_IsObject(player)) {
-        val = cJSON_GetObjectItem(player, "framerate");
-        if (cJSON_IsNumber(val)) player_config.framerate = val->valueint;
-
-        val = cJSON_GetObjectItem(player, "autoplay");
-        if (cJSON_IsNumber(val)) player_config.autoplay = val->valueint;
-
-        val = cJSON_GetObjectItem(player, "autoplay_speed");
-        if (cJSON_IsNumber(val)) player_config.autoplay_speed = val->valueint;
-
-        val = cJSON_GetObjectItem(player, "autostart");
-        if (cJSON_IsNumber(val)) player_config.autostart = val->valueint;
-
-        val = cJSON_GetObjectItem(player, "play_mode");
-        if (cJSON_IsString(val)) strcpy(player_config.play_mode, val->valuestring);
-
-        val = cJSON_GetObjectItem(player, "shuffle");
-        if (cJSON_IsNumber(val)) player_config.shuffle = val->valueint;
-    }
+    // ////////////////////////////////////////////////
+    // // PLAYER SETTINGS
+    // ////////////////////////////////////////////////
+    // cJSON* player = cJSON_GetObjectItem(root, "player");
+    // if (cJSON_IsObject(player)) {
+    //     val = cJSON_GetObjectItem(player, "framerate");
+    //     if (cJSON_IsNumber(val)) player_config.framerate = val->valueint;
+    //
+    //     val = cJSON_GetObjectItem(player, "autoplay");
+    //     if (cJSON_IsNumber(val)) player_config.autoplay = val->valueint;
+    //
+    //     val = cJSON_GetObjectItem(player, "autoplay_speed");
+    //     if (cJSON_IsNumber(val)) player_config.autoplay_speed = val->valueint;
+    //
+    //     val = cJSON_GetObjectItem(player, "autostart");
+    //     if (cJSON_IsNumber(val)) player_config.autostart = val->valueint;
+    //
+    //     val = cJSON_GetObjectItem(player, "play_mode");
+    //     if (cJSON_IsString(val)) strcpy(player_config.play_mode, val->valuestring);
+    //
+    //     val = cJSON_GetObjectItem(player, "shuffle");
+    //     if (cJSON_IsNumber(val)) player_config.shuffle = val->valueint;
+    // }
 
     ////////////////////////////////////////////////
     // STREAMING SETTINGS
@@ -181,16 +206,28 @@ bool Config::loadConfig(char* buf) {
     cJSON* streaming = cJSON_GetObjectItem(root, "streaming");
     if (cJSON_IsObject(streaming)) {
         val = cJSON_GetObjectItem(streaming, "protocol");
-        if (cJSON_IsString(val)) strcpy(streaming_config.protocol, val->valuestring);
+        // if (cJSON_IsString(val)) strcpy(streaming_config.protocol, val->valuestring);
+// enum class LEDProtocol {
+//     E131,
+//     ArtNet
+// };
+// map 'sacn' and 'artnet' in settings to LEDProtocol enum
+        if (cJSON_IsString(val)) {
+          if (strcmp(val->valuestring, "sacn") == 0) {
+            streaming_config.protocol = LEDProtocol::E131;
+          } else if (strcmp(val->valuestring, "artnet") == 0) {
+            streaming_config.protocol = LEDProtocol::ArtNet;
+          }
+        }
 
         val = cJSON_GetObjectItem(streaming, "multicast");
         if (cJSON_IsNumber(val)) streaming_config.multicast = val->valueint;
 
-        val = cJSON_GetObjectItem(streaming, "start_chan");
-        if (cJSON_IsNumber(val)) streaming_config.start_chan = val->valueint;
+        val = cJSON_GetObjectItem(streaming, "start_channel");
+        if (cJSON_IsNumber(val)) streaming_config.start_channel = val->valueint;
 
-        val = cJSON_GetObjectItem(streaming, "start_uni");
-        if (cJSON_IsNumber(val)) streaming_config.start_uni = val->valueint;
+        val = cJSON_GetObjectItem(streaming, "start_universe");
+        if (cJSON_IsNumber(val)) streaming_config.start_universe = val->valueint;
     }
 
     ////////////////////////////////////////////////
@@ -215,6 +252,25 @@ bool Config::loadConfig(char* buf) {
 
         val = cJSON_GetObjectItem(control, "osc_port");
         if (cJSON_IsNumber(val)) osc_port = val->valueint;
+
+        //dmx config
+        val = cJSON_GetObjectItem(control, "dmx_ctrl");
+        if (cJSON_IsNumber(val)) dmx_ctrl = val->valueint;
+
+        val = cJSON_GetObjectItem(control, "dmx_tx_pin");
+        if (cJSON_IsNumber(val)) dmx_tx_pin = val->valueint;
+
+        val = cJSON_GetObjectItem(control, "dmx_rx_pin");
+        if (cJSON_IsNumber(val)) dmx_rx_pin = val->valueint;
+
+        val = cJSON_GetObjectItem(control, "dmx_rst_pin");
+        if (cJSON_IsNumber(val)) dmx_rst_pin = val->valueint;
+        val = cJSON_GetObjectItem(control, "dmx_addr");
+        if (cJSON_IsNumber(val)) dmx_addr = val->valueint;
+
+        val = cJSON_GetObjectItem(control, "num_dmx_channels");
+        if (cJSON_IsNumber(val)) num_dmx_channels = val->valueint;
+
     }
 
     ////////////////////////////////////////////////
@@ -269,14 +325,21 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     cJSON_AddStringToObject(network, "AP_pswd", net_config.AP_pswd);
     cJSON_AddItemToObject(root, "network", network);
 
-    ////////////////////////////////////////////////
-    // LED SETTINGS
-    ////////////////////////////////////////////////
+    // ////////////////////////////////////////////////
+    // // LED SETTINGS
+    // ////////////////////////////////////////////////
     cJSON* leds = cJSON_CreateObject();
     cJSON_AddNumberToObject(leds, "num_pixels", leds_config.num_pixels);
     cJSON_AddNumberToObject(leds, "num_strips", leds_config.num_strips);
     cJSON_AddNumberToObject(leds, "brightness", leds_config.brightness);
-    cJSON_AddStringToObject(leds, "led_type", leds_config.led_type);
+    //map enum to string
+    if (leds_config.led_type == LED_WS2811) {
+      cJSON_AddStringToObject(leds, "led_type", "WS2811");
+    } else if (leds_config.led_type == LED_WS2812) {
+      cJSON_AddStringToObject(leds, "led_type", "WS2812");
+    } else if (leds_config.led_type == LED_WS2812B) {
+      cJSON_AddStringToObject(leds, "led_type", "WS2812B");
+    }
 
     cJSON* pins = cJSON_CreateArray();
     for (int i = 0; i < leds_config.num_strips; i++) {
@@ -285,26 +348,32 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     cJSON_AddItemToObject(leds, "data_pins", pins);
     cJSON_AddItemToObject(root, "leds", leds);
 
-    ////////////////////////////////////////////////
-    // PLAYER SETTINGS
-    ////////////////////////////////////////////////
-    cJSON* player = cJSON_CreateObject();
-    cJSON_AddNumberToObject(player, "framerate", player_config.framerate);
-    cJSON_AddNumberToObject(player, "autoplay", player_config.autoplay);
-    cJSON_AddNumberToObject(player, "autoplay_speed", player_config.autoplay_speed);
-    cJSON_AddNumberToObject(player, "autostart", player_config.autostart);
-    cJSON_AddStringToObject(player, "play_mode", player_config.play_mode);
-    cJSON_AddNumberToObject(player, "shuffle", player_config.shuffle);
-    cJSON_AddItemToObject(root, "player", player);
+    // ////////////////////////////////////////////////
+    // // PLAYER SETTINGS
+    // ////////////////////////////////////////////////
+    // cJSON* player = cJSON_CreateObject();
+    // cJSON_AddNumberToObject(player, "framerate", player_config.framerate);
+    // cJSON_AddNumberToObject(player, "autoplay", player_config.autoplay);
+    // cJSON_AddNumberToObject(player, "autoplay_speed", player_config.autoplay_speed);
+    // cJSON_AddNumberToObject(player, "autostart", player_config.autostart);
+    // cJSON_AddStringToObject(player, "play_mode", player_config.play_mode);
+    // cJSON_AddNumberToObject(player, "shuffle", player_config.shuffle);
+    // cJSON_AddItemToObject(root, "player", player);
 
     ////////////////////////////////////////////////
     // STREAMING SETTINGS
     ////////////////////////////////////////////////
     cJSON* streaming = cJSON_CreateObject();
-    cJSON_AddStringToObject(streaming, "protocol", streaming_config.protocol);
+    // cJSON_AddStringToObject(streaming, "protocol", streaming_config.protocol);
+    if (streaming_config.protocol == LEDProtocol::E131) {
+      cJSON_AddStringToObject(streaming, "protocol", "sacn");
+    } else if (streaming_config.protocol == LEDProtocol::ArtNet) {
+      cJSON_AddStringToObject(streaming, "protocol", "artnet");
+    }
+
     cJSON_AddNumberToObject(streaming, "multicast", streaming_config.multicast);
-    cJSON_AddNumberToObject(streaming, "start_chan", streaming_config.start_chan);
-    cJSON_AddNumberToObject(streaming, "start_uni", streaming_config.start_uni);
+    cJSON_AddNumberToObject(streaming, "start_channel", streaming_config.start_channel);
+    cJSON_AddNumberToObject(streaming, "start_universe", streaming_config.start_universe);
     cJSON_AddItemToObject(root, "streaming", streaming);
 
     ////////////////////////////////////////////////
@@ -317,6 +386,14 @@ bool Config::saveConfigFile(const char* dir, const char* fn) {
     cJSON_AddNumberToObject(ctrl, "serial_baud", uart_baud);
     cJSON_AddNumberToObject(ctrl, "osc", osc_ctrl);
     cJSON_AddNumberToObject(ctrl, "osc_port", osc_port);
+    //dmx config
+    cJSON_AddNumberToObject(ctrl, "dmx_ctrl", dmx_ctrl);
+    cJSON_AddNumberToObject(ctrl, "dmx_tx_pin", dmx_tx_pin);
+    cJSON_AddNumberToObject(ctrl, "dmx_rx_pin", dmx_rx_pin);
+    cJSON_AddNumberToObject(ctrl, "dmx_rst_pin", dmx_rst_pin);
+    cJSON_AddNumberToObject(ctrl, "dmx_addr", dmx_addr);
+    cJSON_AddNumberToObject(ctrl, "num_dmx_channels", num_dmx_channels);
+
     cJSON_AddItemToObject(root, "control", ctrl);
 
     ////////////////////////////////////////////////
@@ -366,6 +443,13 @@ void Config::printConfig() {
     ESP_LOGI(TAG, "UART Baud: %d", uart_baud);
     ESP_LOGI(TAG, "UART TX Pin: %d", uart_tx_pin);
     ESP_LOGI(TAG, "UART RX Pin: %d", uart_rx_pin);
+    //DMX
+    ESP_LOGI(TAG, "DMX Control: %d", dmx_ctrl);
+    ESP_LOGI(TAG, "DMX TX Pin: %d", dmx_tx_pin);
+    ESP_LOGI(TAG, "DMX RX Pin: %d", dmx_rx_pin);
+    ESP_LOGI(TAG, "DMX RST Pin: %d", dmx_rst_pin);
+    ESP_LOGI(TAG, "DMX Address: %d", dmx_addr);
+    ESP_LOGI(TAG, "Number of DMX Channels: %d", num_dmx_channels);
 
     ESP_LOGI(TAG, "DHCP Mode: %d", net_config.dhcp);
     ESP_LOGI(TAG, "IP: %s", net_config.ip);
@@ -380,17 +464,17 @@ void Config::printConfig() {
     ESP_LOGI(TAG, "Number of Pixels: %d", leds_config.num_pixels);
     ESP_LOGI(TAG, "Number of Strips: %d", leds_config.num_strips);
     ESP_LOGI(TAG, "Brightness: %d", leds_config.brightness);
-    ESP_LOGI(TAG, "LED Type: %s", leds_config.led_type);
+    // ESP_LOGI(TAG, "LED Type: %s", leds_config.led_type);
 
-    ESP_LOGI(TAG, "Player Framerate: %d", player_config.framerate);
-    ESP_LOGI(TAG, "Player Autoplay: %d", player_config.autoplay);
-    ESP_LOGI(TAG, "Player Autoplay Speed: %d", player_config.autoplay_speed);
-    ESP_LOGI(TAG, "Player Autostart: %d", player_config.autostart);
-    ESP_LOGI(TAG, "Player Play Mode: %s", player_config.play_mode);
-    ESP_LOGI(TAG, "Player Shuffle: %d", player_config.shuffle);
+    // ESP_LOGI(TAG, "Player Framerate: %d", player_config.framerate);
+    // ESP_LOGI(TAG, "Player Autoplay: %d", player_config.autoplay);
+    // ESP_LOGI(TAG, "Player Autoplay Speed: %d", player_config.autoplay_speed);
+    // ESP_LOGI(TAG, "Player Autostart: %d", player_config.autostart);
+    // ESP_LOGI(TAG, "Player Play Mode: %s", player_config.play_mode);
+    // ESP_LOGI(TAG, "Player Shuffle: %d", player_config.shuffle);
 
-    ESP_LOGI(TAG, "Streaming Protocol: %s", streaming_config.protocol);
+    // ESP_LOGI(TAG, "Streaming Protocol: %d", streaming_config.protocol);
     ESP_LOGI(TAG, "Streaming Multicast: %d", streaming_config.multicast);
-    ESP_LOGI(TAG, "Streaming Start Channel: %d", streaming_config.start_chan);
-    ESP_LOGI(TAG, "Streaming Start Universe: %d", streaming_config.start_uni);
+    ESP_LOGI(TAG, "Streaming Start Channel: %d", streaming_config.start_channel);
+    ESP_LOGI(TAG, "Streaming Start Universe: %d", streaming_config.start_universe);
 }
