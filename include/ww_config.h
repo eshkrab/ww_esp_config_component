@@ -42,7 +42,7 @@ public:
 
     net_config_t net_config;
     pixel_config_t leds_config;
-    // player_config_t player_config;  // Player settings
+    player_config_t player_config;  // Player settings
     sacn_config_t streaming_config;  // Streaming settings
 
     Config();

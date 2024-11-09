@@ -176,29 +176,29 @@ bool Config::loadConfig(char* buf) {
         }
     }
 
-    // ////////////////////////////////////////////////
-    // // PLAYER SETTINGS
-    // ////////////////////////////////////////////////
-    // cJSON* player = cJSON_GetObjectItem(root, "player");
-    // if (cJSON_IsObject(player)) {
-    //     val = cJSON_GetObjectItem(player, "framerate");
-    //     if (cJSON_IsNumber(val)) player_config.framerate = val->valueint;
-    //
-    //     val = cJSON_GetObjectItem(player, "autoplay");
-    //     if (cJSON_IsNumber(val)) player_config.autoplay = val->valueint;
-    //
-    //     val = cJSON_GetObjectItem(player, "autoplay_speed");
-    //     if (cJSON_IsNumber(val)) player_config.autoplay_speed = val->valueint;
-    //
-    //     val = cJSON_GetObjectItem(player, "autostart");
-    //     if (cJSON_IsNumber(val)) player_config.autostart = val->valueint;
-    //
-    //     val = cJSON_GetObjectItem(player, "play_mode");
-    //     if (cJSON_IsString(val)) strcpy(player_config.play_mode, val->valuestring);
-    //
-    //     val = cJSON_GetObjectItem(player, "shuffle");
-    //     if (cJSON_IsNumber(val)) player_config.shuffle = val->valueint;
-    // }
+    ////////////////////////////////////////////////
+    // PLAYER SETTINGS
+    ////////////////////////////////////////////////
+    cJSON* player = cJSON_GetObjectItem(root, "player");
+    if (cJSON_IsObject(player)) {
+        val = cJSON_GetObjectItem(player, "framerate");
+        if (cJSON_IsNumber(val)) player_config.framerate = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "autoplay");
+        if (cJSON_IsNumber(val)) player_config.autoplay = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "autoplay_speed");
+        if (cJSON_IsNumber(val)) player_config.autoplay_speed = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "autostart");
+        if (cJSON_IsNumber(val)) player_config.autostart = val->valueint;
+
+        val = cJSON_GetObjectItem(player, "play_mode");
+        if (cJSON_IsString(val)) strcpy(player_config.play_mode, val->valuestring);
+
+        val = cJSON_GetObjectItem(player, "shuffle");
+        if (cJSON_IsNumber(val)) player_config.shuffle = val->valueint;
+    }
 
     ////////////////////////////////////////////////
     // STREAMING SETTINGS
